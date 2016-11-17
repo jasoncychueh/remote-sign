@@ -2,6 +2,7 @@ apply plugin: 'groovy'
 apply plugin: 'maven'
 
 group = 'com.github.jasoncychueh'
+version = '1.0.0'
 
 repositories {
     jcenter()
@@ -9,6 +10,7 @@ repositories {
 
 dependencies {
     compile gradleApi()
+    compile localGroovy()
 
     compile 'org.slf4j:slf4j-api:1.7.21'
 
