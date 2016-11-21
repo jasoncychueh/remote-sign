@@ -156,7 +156,8 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         System.out.println("")
         logger.debug("response={}", response)
         if (response.code() == 201) {
-            System.out.print("Waiting the signing task to be done...")
+            logger.info("Waiting the signing task to be done...")
+            // System.out.print("Waiting the signing task to be done...")
             int jobId = getJobId(reqId, "Remote_APK_CERT_TOOL")
             System.out.println()
             logger.debug("jobId={}", jobId)
@@ -237,7 +238,6 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         conn.close()
 
         if (jobId == -1) {
-            logger.info("Waiting the signing task to be done...")
             try {
                 Thread.sleep(2000)
             } catch (InterruptedException e) {
