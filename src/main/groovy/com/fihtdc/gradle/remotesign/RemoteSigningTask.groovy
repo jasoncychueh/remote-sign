@@ -151,7 +151,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
                 .build()
         logger.info("Uploading APK...")
 
-        System.out.println("Uploading APK...")
+        // System.out.println("Uploading APK...")
         Response response = mClient.newCall(request).execute()
         System.out.println("")
         logger.debug("response={}", response)
@@ -182,9 +182,14 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         long contentLength = response.body().contentLength()
         InputStream ins = response.body().byteStream()
 
-        System.out.println("Downloading apk from " + url + "...")
+        // System.out.println("Downloading apk from " + url + "...")
         byte[] buffer = new byte[4096]
-        FileOutputStream out = new FileOutputStream(outputFile)
+        File tempFile = new File(mOutputFile.parent, "temp.apk");
+
+        if (tempFile.exists() && !tempFile.delete()) {
+            throw new IOException("Failed to delete temp APK")
+        }
+        FileOutputStream out = new FileOutputStream(tempFile)
         int byteCounts = 0
         for (int len; (len = ins.read(buffer)) != -1;) {
             out.write(buffer, 0, len)
@@ -193,10 +198,17 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
                 listener.onProgress((int) (100F * byteCounts / contentLength))
             }
         }
-        System.out.println()
         out.flush()
         out.close()
         response.body().close()
+        System.out.println()
+
+        if (mOutputFile.exists() && !mOutputFile.delete()) {
+            throw new IOException("Failed to rename APK")
+        }
+        if (!tempFile.renameTo(mOutputFile)) {
+            throw new IOException("Failed to rename APK")
+        }
     }
 
     private int getJobId(long reqId, String jobName) throws SQLException {
