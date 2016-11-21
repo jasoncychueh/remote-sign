@@ -12,10 +12,10 @@ import com.android.build.gradle.internal.scope.AndroidTask
 import com.android.build.gradle.internal.scope.AndroidTaskRegistry
 import com.android.build.gradle.internal.scope.DefaultGradlePackagingScope
 import com.android.build.gradle.internal.scope.VariantOutputScope
-import com.android.build.gradle.internal.variant.ApkVariantOutputData
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.internal.reflect.Instantiator
 
 import javax.inject.Inject
@@ -29,13 +29,11 @@ class RemoteSignPlugin implements Plugin<Project> {
     private mProperties = Collections.synchronizedMap([:])
 
     def getRemoteSigningConfig(delegate) {
-        def buildType = delegate instanceof ReadOnlyBuildType ? delegate.buildType : delegate
-        return mProperties[System.identityHashCode(buildType) + "remoteSigningConfig"]
+        return mProperties[System.identityHashCode(delegate) + "remoteSigningConfig"]
     }
 
     def remoteSigningConfig(delegate, config) {
-        def buildType = delegate instanceof ReadOnlyBuildType ? delegate.buildType : delegate
-        mProperties[System.identityHashCode(buildType) + "remoteSigningConfig"] = config
+        mProperties[System.identityHashCode(delegate) + "remoteSigningConfig"] = config
     }
 
     @Inject
@@ -61,8 +59,12 @@ class RemoteSignPlugin implements Plugin<Project> {
 
         BuildType.metaClass.getRemoteSigningConfig << { getRemoteSigningConfig(delegate) }
 
-        BuildType.metaClass.remoteSigningConfig << { RemoteSigningConfig config ->
+        BuildType.metaClass.remoteSigningConfig << { config ->
             remoteSigningConfig(delegate, config)
+        }
+
+        ReadOnlyBuildType.metaClass.getRemoteSigningConfig << {
+            buildType.remoteSigningConfig
         }
 
         project.getPluginManager().withPlugin('com.android.application', { plugin ->
@@ -74,32 +76,19 @@ class RemoteSignPlugin implements Plugin<Project> {
                 AndroidTaskRegistry androidTasks = appPlugin.taskManager.androidTasks
 
                 project.android.applicationVariants.each { ApplicationVariant variant ->
-                    variant.buildType.metaClass.getRemoteSigningConfig << {
-                        getRemoteSigningConfig(delegate)
-                    }
-
-                    variant.buildType.metaClass.remoteSigningConfig << { RemoteSigningConfig config ->
-                        remoteSigningConfig(delegate, config)
-                    }
-
-                    // println variant.buildType.remoteSigningConfig
                     if (variant.buildType.remoteSigningConfig != null) {
-                        List<ApkVariantOutputData> outputDataList = variant.apkVariantData.outputs
-
-                        def files = []
-                        variant.outputs.each { output ->
-                            files << output.packageApplication.outputFile
-                        }
-
-                        outputDataList.each { outputData ->
+                        variant.apkVariantData.outputs.each { outputData ->
                             VariantOutputScope outputScope = outputData.scope
 
                             DefaultGradlePackagingScope packagingScope = new DefaultGradlePackagingScope(outputScope);
                             def configAction = new RemoteSigningTask.ConfigAction(packagingScope, variant)
 
                             AndroidTask<RemoteSigningTask> signingTask = androidTasks.create(tasks, configAction)
-                            AndroidTask<?> packageTask = androidTasks.get(packagingScope.getTaskName('package'));
-                            AndroidTask<?> assembleTask = androidTasks.get(packagingScope.getTaskName('assemble'))
+                            AndroidTask<? extends Task> packageTask = androidTasks.get(packagingScope.getTaskName('package'))
+                            AndroidTask<? extends Task> assembleTask = androidTasks.get(packagingScope.getTaskName('assemble'))
+                            // AndroidTask<? extends Task> installTask = androidTasks.get(packagingScope.getTaskName('install'))
+
+                            // println installTask
 
                             /*println "Origin packageTask: ${packageTask.downstreamTasks}"
                             println "Origin assembleTask: ${assembleTask.downstreamTasks}"*/
