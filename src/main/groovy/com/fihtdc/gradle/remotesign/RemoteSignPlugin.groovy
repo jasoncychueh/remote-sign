@@ -64,7 +64,7 @@ class RemoteSignPlugin implements Plugin<Project> {
         }
 
         ReadOnlyBuildType.metaClass.getRemoteSigningConfig << {
-            buildType.remoteSigningConfig
+            getRemoteSigningConfig(delegate.buildType)
         }
 
         project.getPluginManager().withPlugin('com.android.application', { plugin ->
