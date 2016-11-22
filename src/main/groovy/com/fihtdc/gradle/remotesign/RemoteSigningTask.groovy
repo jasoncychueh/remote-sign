@@ -35,7 +35,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
 
     private static final String DB_URL = "jdbc:mysql://%s/Jenkins"
 
-    private RemoteSigningConfig mConfig
+    private def mConfig
     private File mInputFile
     private File mOutputFile
 
@@ -53,7 +53,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         }
     }
 
-    void setRemoteSigningConfig(RemoteSigningConfig remoteSigningConfig) {
+    void setRemoteSigningConfig(remoteSigningConfig) {
         mConfig = remoteSigningConfig
     }
 
@@ -216,7 +216,6 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         String url = String.format(Locale.getDefault(), DB_URL, mConfig.getServerHost())
         logger.debug("dbUrl={}", url)
 
-
         Driver driver = new Driver()
         String sql = "SELECT job_id FROM job_status WHERE job_name='%s' AND request_id='%d'"
         sql = String.format(Locale.getDefault(), sql, jobName, reqId)
@@ -275,7 +274,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
                 androidBuilder = mPackagingScope.androidBuilder
                 variantName = mPackagingScope.fullVariantName
                 remoteSigningConfig = mApplicationVariant.buildType.remoteSigningConfig
-                inputFile = mPackagingScope.outputApk
+                inputFile = new File("${mPackagingScope.outputApk}".replaceAll("-unsigned", ""))
             }
         }
     }

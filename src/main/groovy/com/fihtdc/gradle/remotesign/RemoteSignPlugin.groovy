@@ -11,7 +11,7 @@ import com.android.build.gradle.internal.dsl.BuildType
 import com.android.build.gradle.internal.scope.AndroidTask
 import com.android.build.gradle.internal.scope.AndroidTaskRegistry
 import com.android.build.gradle.internal.scope.DefaultGradlePackagingScope
-import com.android.build.gradle.internal.scope.VariantOutputScope
+import com.android.build.gradle.internal.tasks.InstallVariantTask
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -78,17 +78,13 @@ class RemoteSignPlugin implements Plugin<Project> {
                 project.android.applicationVariants.each { ApplicationVariant variant ->
                     if (variant.buildType.remoteSigningConfig != null) {
                         variant.apkVariantData.outputs.each { outputData ->
-                            VariantOutputScope outputScope = outputData.scope
-
-                            DefaultGradlePackagingScope packagingScope = new DefaultGradlePackagingScope(outputScope);
+                            DefaultGradlePackagingScope packagingScope = new DefaultGradlePackagingScope(outputData.scope);
                             def configAction = new RemoteSigningTask.ConfigAction(packagingScope, variant)
 
                             AndroidTask<RemoteSigningTask> signingTask = androidTasks.create(tasks, configAction)
                             AndroidTask<? extends Task> packageTask = androidTasks.get(packagingScope.getTaskName('package'))
                             AndroidTask<? extends Task> assembleTask = androidTasks.get(packagingScope.getTaskName('assemble'))
-                            // AndroidTask<? extends Task> installTask = androidTasks.get(packagingScope.getTaskName('install'))
-
-                            // println installTask
+                            AndroidTask<? extends Task> installTask = androidTasks.get(packagingScope.getTaskName('install'))
 
                             /*println "Origin packageTask: ${packageTask.downstreamTasks}"
                             println "Origin assembleTask: ${assembleTask.downstreamTasks}"*/
@@ -98,6 +94,15 @@ class RemoteSignPlugin implements Plugin<Project> {
 
                             /*println "New packageTask: ${packageTask.downstreamTasks}"
                             println "New assembleTask: ${assembleTask.downstreamTasks}"*/
+
+                            def task = project.tasks.getByName(packageTask.name)
+                            task.outputFile = new File("${task.outputFile}".replaceAll("-unsigned", ""))
+
+                            if (installTask == null) {
+                                configAction = new InstallVariantTask.ConfigAction(outputData.scope.variantScope)
+                                installTask = androidTasks.create(tasks, configAction)
+                                installTask.dependsOn(tasks, assembleTask)
+                            }
                         }
                     }
                 }
