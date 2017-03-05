@@ -274,7 +274,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
                 androidBuilder = mPackagingScope.androidBuilder
                 variantName = mPackagingScope.fullVariantName
                 remoteSigningConfig = mApplicationVariant.buildType.remoteSigningConfig
-                inputFile = new File("${mPackagingScope.outputApk}".replaceAll("-unsigned", ""))
+                inputFile = new File("${mPackagingScope.outputPackage}".replaceAll("-unsigned", ""))
             }
         }
     }

@@ -2,6 +2,7 @@ package com.fihtdc.gradle.remotesign
 
 import com.android.annotations.NonNull
 import com.android.build.gradle.BaseExtension
+import com.android.build.gradle.BasePlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.android.build.gradle.internal.BadPluginException
 import com.android.build.gradle.internal.TaskContainerAdaptor
@@ -19,6 +20,7 @@ import org.gradle.api.Task
 import org.gradle.internal.reflect.Instantiator
 
 import javax.inject.Inject
+import java.lang.reflect.Field
 
 /**
  * Created by Jason on 11/12/2016.
@@ -73,7 +75,10 @@ class RemoteSignPlugin implements Plugin<Project> {
 
                 def appPlugin = project.plugins.findPlugin(plugin.id)
                 def TaskFactory tasks = new TaskContainerAdaptor(project.getTasks());
-                AndroidTaskRegistry androidTasks = appPlugin.taskManager.androidTasks
+
+                Field field = BasePlugin.class.getDeclaredField("taskManager")
+                field.setAccessible(true)
+                AndroidTaskRegistry androidTasks = field.get(appPlugin).androidTasks
 
                 project.android.applicationVariants.each { ApplicationVariant variant ->
                     if (variant.buildType.remoteSigningConfig != null) {
