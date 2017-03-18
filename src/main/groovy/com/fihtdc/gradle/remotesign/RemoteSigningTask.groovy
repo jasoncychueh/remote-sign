@@ -45,11 +45,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
     protected void doFullTaskAction() throws IOException {
         createHttpClient()
         if (mInputFile.name.endsWith(".apk")) {
-            try {
-                signApk(mInputFile, mOutputFile)
-            } catch (IOException | SQLException e) {
-                logger.error(e.getMessage(), e)
-            }
+            signApk(mInputFile, mOutputFile)
         }
     }
 
