@@ -1,5 +1,5 @@
 [![GitHub license](https://img.shields.io/github/license/dcendents/android-maven-gradle-plugin.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
-[![](https://jitpack.io/v/jasoncychueh/remote-sign.svg)](https://jitpack.io/#jasoncychueh/remote-sign/1.0.1)
+[![](https://jitpack.io/v/jasoncychueh/remote-sign.svg)](https://jitpack.io/#jasoncychueh/remote-sign/1.1.0)
 
 # Remote Sign Gradle Plugin
 > A gradle plugin which only can be used internally in Foxconn for remote signing APK
@@ -14,17 +14,16 @@ buildscript {
         maven { url "https://jitpack.io" }
     }
     dependencies {
-        classpath 'com.github.jasoncychueh:remote-sign:1.0.1'
+        classpath 'com.github.jasoncychueh:remote-sign:1.1.0'
     }
 }
 ```
 
-Then, apply the plugin before android application plugin:
+Then, apply the plugin after android application plugin:
 
 ```gradle
-// must before android application plugin
-apply plugin: 'com.fihtdc.gradle.remote-sign'
 apply plugin: 'com.android.application'
+apply plugin: 'com.fihtdc.gradle.remote-sign'
 ```
 
 ### Configuration
