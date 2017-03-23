@@ -6,13 +6,7 @@ import com.android.build.gradle.internal.scope.PackagingScope
 import com.android.build.gradle.internal.scope.TaskConfigAction
 import com.android.build.gradle.internal.tasks.IncrementalTask
 import com.mysql.jdbc.Driver
-import okhttp3.Credentials
-import okhttp3.MediaType
-import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody
-import okhttp3.Response
+import okhttp3.*
 import org.gradle.api.Task
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.OutputFile
@@ -269,9 +263,16 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
             task.configure {
                 androidBuilder = mPackagingScope.androidBuilder
                 variantName = mPackagingScope.fullVariantName
-                remoteSigningConfig = mApplicationVariant.buildType.remoteSigningConfig
-                inputFile = new File("${mPackagingScope.outputPackage}".replaceAll("-unsigned", ""))
+                remoteSigningConfig = mApplicationVariant.remoteSigningConfig
+                inputFile = new File("${getOutputPackage()}".replaceAll("-unsigned", ""))
             }
+        }
+
+        private String getOutputPackage(){
+            if (mPackagingScope.hasProperty("outputPackage")){
+                return mPackagingScope.outputPackage;
+            }
+            return mPackagingScope.outputApk;
         }
     }
 }

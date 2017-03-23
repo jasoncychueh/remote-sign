@@ -2,21 +2,20 @@ package com.fihtdc.gradle.remotesign
 
 import com.android.annotations.NonNull
 import com.android.build.gradle.BaseExtension
-import com.android.build.gradle.BasePlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.android.build.gradle.internal.BadPluginException
 import com.android.build.gradle.internal.TaskContainerAdaptor
-import com.android.build.gradle.internal.TaskFactory
 import com.android.build.gradle.internal.api.ReadOnlyBuildType
+import com.android.build.gradle.internal.api.ReadOnlyProductFlavor
 import com.android.build.gradle.internal.dsl.BuildType
-import com.android.build.gradle.internal.scope.AndroidTask
 import com.android.build.gradle.internal.scope.AndroidTaskRegistry
 import com.android.build.gradle.internal.scope.DefaultGradlePackagingScope
 import com.android.build.gradle.internal.tasks.InstallVariantTask
+import com.android.builder.model.ProductFlavor
+import org.apache.commons.lang3.reflect.FieldUtils
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.Task
 import org.gradle.internal.reflect.Instantiator
 
 import javax.inject.Inject
@@ -31,23 +30,36 @@ class RemoteSignPlugin implements Plugin<Project> {
     private mProperties = Collections.synchronizedMap([:])
 
     def getRemoteSigningConfig(delegate) {
-        def buildType = getRealBuildType(delegate)
-        return mProperties[System.identityHashCode(buildType) + "remoteSigningConfig"]
+        delegate = getRealDelegate(delegate)
+        return mProperties[System.identityHashCode(delegate) + "_RemoteSigningConfig"]
     }
 
-    def remoteSigningConfig(delegate, config) {
-        def buildType = getRealBuildType(delegate)
-        mProperties[System.identityHashCode(buildType) + "remoteSigningConfig"] = config
+    def setRemoteSigningConfig(delegate, config) {
+        delegate = getRealDelegate(delegate)
+        mProperties[System.identityHashCode(delegate) + "_RemoteSigningConfig"] = config
     }
 
-    def getRealBuildType(buildType) {
-        if (buildType.class != ReadOnlyBuildType.class) {
-            return buildType;
+    def getRealDelegate(delegate) {
+        if (delegate.class == ReadOnlyBuildType.class) {
+            Field field = delegate.class.getDeclaredField("buildType");
+            field.setAccessible(true);
+            return field.get(delegate);
+        } else if (delegate.class == ReadOnlyProductFlavor.class) {
+            Field field = delegate.class.getDeclaredField("productFlavor");
+            field.setAccessible(true);
+            return field.get(delegate);
         }
+        return delegate;
+    }
 
-        Field field = buildType.class.getDeclaredField("buildType");
-        field.setAccessible(true);
-        return field.get(buildType);
+    def getTaskRegistry(def appPlugin) {
+        return FieldUtils.getField(appPlugin.class, "taskManager", true).get(appPlugin).androidTasks
+    }
+
+    private void setSigningConfig(def variant, def signingConfig) {
+        def variantConfig = variant.variantData.variantConfiguration
+        Field field = FieldUtils.getField(variantConfig.class, "mSigningConfigOverride", true)
+        field.set(variantConfig, signingConfig)
     }
 
     @Inject
@@ -57,12 +69,13 @@ class RemoteSignPlugin implements Plugin<Project> {
 
     void apply(Project project) {
         if (!project.plugins.hasPlugin("com.android.application")) {
-            throw new BadPluginException("Remote sign plugin needs to work with the 'android' plugin."
+            throw new BadPluginException("Remote sign plugin needs to work with 'android' plugin."
                     + " Did you apply remote sign plugin before 'android' plugin?")
         }
 
+        def configFactory = new RemoteSigningConfigFactory(mInstantiator, project.logger)
         NamedDomainObjectContainer<RemoteSigningConfig> remoteSigningConfigs = project
-                .container(RemoteSigningConfig, new RemoteSigningConfigFactory(mInstantiator, project.logger));
+                .container(RemoteSigningConfig, configFactory);
 
         BaseExtension.metaClass.remoteSigningConfigs = { Closure closure ->
             delegate.checkWritability();
@@ -74,11 +87,21 @@ class RemoteSignPlugin implements Plugin<Project> {
         BuildType.metaClass.getRemoteSigningConfig << { getRemoteSigningConfig(delegate) }
 
         BuildType.metaClass.remoteSigningConfig << { config ->
-            remoteSigningConfig(delegate, config)
+            setRemoteSigningConfig(delegate, config)
         }
 
         ReadOnlyBuildType.metaClass.getRemoteSigningConfig << {
             delegate.buildType.remoteSigningConfig
+        }
+
+        ProductFlavor.metaClass.getRemoteSigningConfig << { getRemoteSigningConfig(delegate) }
+
+        ProductFlavor.metaClass.remoteSigningConfig << { config ->
+            setRemoteSigningConfig(delegate, config)
+        }
+
+        ReadOnlyProductFlavor.metaClass.getRemoteSigningConfig << {
+            delegate.productFlavor.remoteSigningConfig
         }
 
         project.getPluginManager().withPlugin('com.android.application', { plugin ->
@@ -86,37 +109,54 @@ class RemoteSignPlugin implements Plugin<Project> {
                 project.logger.debug("Creating task remoteSign for each build type.")
 
                 def appPlugin = project.plugins.findPlugin(plugin.id)
-                def TaskFactory tasks = new TaskContainerAdaptor(project.getTasks());
-
-                Field field = BasePlugin.class.getDeclaredField("taskManager")
-                field.setAccessible(true)
-                AndroidTaskRegistry androidTasks = field.get(appPlugin).androidTasks
+                def tasks = new TaskContainerAdaptor(project.getTasks());
+                AndroidTaskRegistry androidTasks = getTaskRegistry(appPlugin)
 
                 project.android.applicationVariants.each { ApplicationVariant variant ->
                     variant.buildType.metaClass.getRemoteSigningConfig << {
                         getRemoteSigningConfig(delegate)
                     }
 
-                    def realBuildType = getRealBuildType(variant.buildType);
+                    variant.metaClass.getRemoteSigningConfig << {
+                        getRemoteSigningConfig(delegate)
+                    }
+
+                    def realBuildType = getRealDelegate(variant.buildType);
                     realBuildType.metaClass.getRemoteSigningConfig << {
                         getRemoteSigningConfig(delegate)
                     }
-                    realBuildType.metaClass.remoteSigningConfig << { config ->
-                        remoteSigningConfig(delegate, config)
-                    }
-                    if (realBuildType.remoteSigningConfig != null && realBuildType.signingConfig == null) {
-                        realBuildType.signingConfig = project.android.buildTypes['debug'].signingConfig
+                    realBuildType.metaClass.setRemoteSigningConfig << { config ->
+                        setRemoteSigningConfig(delegate, config)
                     }
 
-                    if (variant.buildType.remoteSigningConfig != null) {
+                    if (realBuildType.remoteSigningConfig == null) {
+                        def flavors = variant.variantData.variantConfiguration.productFlavors
+                        flavors.reverseEach { flavor ->
+                            if (flavor.remoteSigningConfig != null) {
+                                setRemoteSigningConfig(variant, flavor.remoteSigningConfig)
+                            }
+                        }
+                    } else {
+                        setRemoteSigningConfig(variant, realBuildType.remoteSigningConfig)
+                    }
+
+                    if (variant.signingConfig == null) {
+                        setSigningConfig(variant, project.android.signingConfigs.debug)
+                    }
+
+                    if (variant.remoteSigningConfig != null) {
                         variant.apkVariantData.outputs.each { outputData ->
-                            DefaultGradlePackagingScope packagingScope = new DefaultGradlePackagingScope(outputData.scope);
-                            def configAction = new RemoteSigningTask.ConfigAction(packagingScope, variant)
+                            variant.metaClass.getRemoteSigningConfig << {
+                                getRemoteSigningConfig(delegate)
+                            }
 
-                            AndroidTask<RemoteSigningTask> signingTask = androidTasks.create(tasks, configAction)
-                            AndroidTask<? extends Task> packageTask = androidTasks.get(packagingScope.getTaskName('package'))
-                            AndroidTask<? extends Task> assembleTask = androidTasks.get(packagingScope.getTaskName('assemble'))
-                            AndroidTask<? extends Task> installTask = androidTasks.get(packagingScope.getTaskName('install'))
+                            def scope = new DefaultGradlePackagingScope(outputData.scope);
+                            def configAction = new RemoteSigningTask.ConfigAction(scope, variant)
+
+                            def signingTask = androidTasks.create(tasks, configAction)
+                            def packageTask = androidTasks.get(scope.getTaskName('package'))
+                            def assembleTask = androidTasks.get(scope.getTaskName('assemble'))
+                            def installTask = androidTasks.get(scope.getTaskName('install'))
 
                             /*println "Origin packageTask: ${packageTask.downstreamTasks}"
                             println "Origin assembleTask: ${assembleTask.downstreamTasks}"*/
@@ -127,11 +167,9 @@ class RemoteSignPlugin implements Plugin<Project> {
                             /*println "New packageTask: ${packageTask.downstreamTasks}"
                             println "New assembleTask: ${assembleTask.downstreamTasks}"*/
 
-                            def task = project.tasks.getByName(packageTask.name)
-                            task.outputFile = new File("${task.outputFile}".replaceAll("-unsigned", ""))
-
                             if (installTask == null) {
-                                configAction = new InstallVariantTask.ConfigAction(outputData.scope.variantScope)
+                                def variantScope = outputData.scope.variantScope
+                                configAction = new InstallVariantTask.ConfigAction(variantScope)
                                 installTask = androidTasks.create(tasks, configAction)
                                 installTask.dependsOn(tasks, assembleTask)
                             }
