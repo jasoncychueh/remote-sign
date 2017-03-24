@@ -6,7 +6,13 @@ import com.android.build.gradle.internal.scope.PackagingScope
 import com.android.build.gradle.internal.scope.TaskConfigAction
 import com.android.build.gradle.internal.tasks.IncrementalTask
 import com.mysql.jdbc.Driver
-import okhttp3.*
+import okhttp3.Credentials
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.Response
 import org.gradle.api.Task
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.OutputFile
@@ -80,11 +86,12 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectTimeout(5, TimeUnit.SECONDS)
 
+        String proxyHost = System.getProperty("http.proxyHost", null)
+        String portStr = System.getProperty("http.proxyPort", null)
+        String proxyUser = System.getProperty("http.proxyUser", null)
+        String proxyPassword = System.getProperty("http.proxyPassword", null)
         try {
-            String proxyHost = System.getProperty("http.proxyHost", null)
-            int proxyPort = Integer.parseInt(System.getProperty("http.proxyPort", null))
-            String proxyUser = System.getProperty("http.proxyUser", null)
-            String proxyPassword = System.getProperty("http.proxyPassword", null)
+            int proxyPort = portStr == null ? 80 : Integer.parseInt(portStr)
 
             if (proxyHost != null) {
                 logger.info("Found proxy '{}' in gradle settings.", proxyHost)
@@ -103,7 +110,7 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
                 }
             }
         } catch (NumberFormatException e) {
-            // ignored
+            throw new NumberFormatException("Invalid port number, " + portStr)
         }
 
         mClient = builder.build()
@@ -268,8 +275,8 @@ buildWithParameters?assertMethod=online&KEY_SET=%s&APK_CERT=%s&REQ_ID=%s&APK_NAM
             }
         }
 
-        private String getOutputPackage(){
-            if (mPackagingScope.hasProperty("outputPackage")){
+        private String getOutputPackage() {
+            if (mPackagingScope.hasProperty("outputPackage")) {
                 return mPackagingScope.outputPackage;
             }
             return mPackagingScope.outputApk;
