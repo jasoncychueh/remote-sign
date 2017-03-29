@@ -1,5 +1,5 @@
 [![GitHub license](https://img.shields.io/github/license/dcendents/android-maven-gradle-plugin.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
-[![](https://jitpack.io/v/jasoncychueh/remote-sign.svg)](https://jitpack.io/#jasoncychueh/remote-sign/1.1.0)
+[![](https://jitpack.io/v/jasoncychueh/remote-sign.svg)](https://jitpack.io/#jasoncychueh/remote-sign/1.2.0)
 
 # Remote Sign Gradle Plugin
 > A gradle plugin which only can be used internally in Foxconn for remote signing APK
@@ -14,7 +14,7 @@ buildscript {
         maven { url "https://jitpack.io" }
     }
     dependencies {
-        classpath 'com.github.jasoncychueh:remote-sign:1.1.0'
+        classpath 'com.github.jasoncychueh:remote-sign:1.2.0'
     }
 }
 ```
@@ -78,6 +78,31 @@ android {
         someOtherRelease2 {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            remoteSigningConfig remoteSigningConfigs.keyset2
+        }
+    }
+}
+```
+
+You can also set the remoteSigningConfig in product flavors or default config. If the product flavor and build type both contains remote signing config, the one in the build type will be taken.
+```gradle
+android {
+
+    /* Skip some configurations... */
+    defaultConfig {
+        applicationId "your.application.id"
+        minSdkVersion 25
+        targetSdkVersion 25
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        remoteSigningConfig remoteSigningConfigs.keyset1
+    }
+
+    productFlavors {
+            remoteSigningConfig remoteSigningConfigs.keyset1
+        }
+        flavor2 {
             remoteSigningConfig remoteSigningConfigs.keyset2
         }
     }
