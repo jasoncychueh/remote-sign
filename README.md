@@ -2,7 +2,7 @@
 [![](https://jitpack.io/v/jasoncychueh/remote-sign.svg)](https://jitpack.io/#jasoncychueh/remote-sign/1.2.0)
 
 # Remote Sign Gradle Plugin
-> A gradle plugin can *only* be used internally in *Foxconn* for remote signing APK
+> A gradle plugin can **only** be used internally in **Foxconn** for remote signing APK
 
 ### Apply remote sign plugin
 
